@@ -48,10 +48,12 @@ export function summarize(scope: Scope, month: string, data: BudgetData) {
   let carried = 0;
   let uncategorized = 0;
   let uncategorizedCount = 0;
+  const counted: Tx[] = [];
   for (const t of data.transactions) {
     // Les opérations rattachées à un voyage comptent dans son budget, pas dans le mois.
     if (t.is_transfer || t.trip_id || !accountIds.has(t.account_id)) continue;
     if (budgetMonth(t, shifted) !== month) continue;
+    counted.push(t);
     const isIncome = t.category_id
       ? kindOf.get(t.category_id) === "revenu"
       : t.amount > 0;
@@ -86,6 +88,8 @@ export function summarize(scope: Scope, month: string, data: BudgetData) {
     uncategorized,
     uncategorizedCount,
     expenses,
+    /** Opérations comptées dans ce budget ce mois-ci. */
+    transactions: counted,
   };
 }
 

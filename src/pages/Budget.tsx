@@ -1,14 +1,23 @@
 import { useState } from "react";
 import { summarize } from "../budget";
 import { useData } from "../data";
-import { currentMonth, money, money0, monthLabel, shiftMonth } from "../format";
-import { SCOPE_LABEL, type Scope } from "../types";
+import {
+  currentMonth,
+  dayLabel,
+  money,
+  money0,
+  monthLabel,
+  shiftMonth,
+} from "../format";
+import { SCOPE_LABEL, type Scope, type Tx } from "../types";
 import { Bar, CatIcon, MonthNav, Ring } from "../ui";
 
 export default function Budget({ scope }: { scope: Scope }) {
   const data = useData();
   const { accounts, setBudget } = data;
   const [month, setMonth] = useState(currentMonth);
+  // Catégorie dont on affiche le détail des opérations.
+  const [open, setOpen] = useState<string | null>(null);
 
   const scopeAccounts = accounts.filter((a) => a.budget_scope === scope);
   const s = summarize(scope, month, data);
@@ -95,33 +104,50 @@ export default function Budget({ scope }: { scope: Scope }) {
           <span className="muted small">Plafond</span>
         </div>
         <div className="rows">
-          {s.expenses.map(({ category: c, spent, limit }) => (
-            <div className="row" key={c.id}>
-              <CatIcon name={c.name} />
-              <div className="main">
-                <div className="title">{c.name}</div>
-                <div
-                  className={`small num ${limit !== undefined && spent > limit ? "bad" : "muted"}`}
+          {s.expenses.map(({ category: c, spent, limit }) => {
+            const ops = s.transactions.filter((t) => t.category_id === c.id);
+            const isOpen = open === c.id;
+            return (
+              <div className="row" key={c.id}>
+                <button
+                  className="link row-toggle"
+                  aria-expanded={isOpen}
+                  disabled={ops.length === 0}
+                  onClick={() => setOpen(isOpen ? null : c.id)}
                 >
-                  {money(spent)}
-                  {limit !== undefined &&
-                    (spent > limit
-                      ? ` · dépassé de ${money0(spent - limit)}`
-                      : ` · reste ${money0(limit - spent)}`)}
-                </div>
+                  <CatIcon name={c.name} />
+                  <span className="main">
+                    <span className="title">
+                      {c.name}
+                      {ops.length > 0 && (
+                        <span className="chev"> {isOpen ? "▾" : "▸"}</span>
+                      )}
+                    </span>
+                    <span
+                      className={`small num ${limit !== undefined && spent > limit ? "bad" : "muted"}`}
+                    >
+                      {money(spent)}
+                      {limit !== undefined &&
+                        (spent > limit
+                          ? ` · dépassé de ${money0(spent - limit)}`
+                          : ` · reste ${money0(limit - spent)}`)}
+                    </span>
+                  </span>
+                </button>
+                <LimitInput
+                  value={limit}
+                  label={c.name}
+                  onChange={(v) => void setBudget(scope, c.id, v)}
+                />
+                {limit !== undefined && (
+                  <div className="wide">
+                    <Bar ratio={limit ? spent / limit : spent > 0 ? 2 : 0} />
+                  </div>
+                )}
+                {isOpen && <CategoryOps ops={ops} />}
               </div>
-              <LimitInput
-                value={limit}
-                label={c.name}
-                onChange={(v) => void setBudget(scope, c.id, v)}
-              />
-              {limit !== undefined && (
-                <div className="wide">
-                  <Bar ratio={limit ? spent / limit : spent > 0 ? 2 : 0} />
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -151,6 +177,58 @@ export default function Budget({ scope }: { scope: Scope }) {
           : "Aucun compte rattaché à ce budget (voir Réglages)."}
       </p>
     </>
+  );
+}
+
+/** Détail des opérations d'une catégorie ; toucher une ligne permet de la reclasser. */
+function CategoryOps({ ops }: { ops: Tx[] }) {
+  const { categories, update } = useData();
+  const [editing, setEditing] = useState<string | null>(null);
+  return (
+    <div className="ops">
+      {ops.map((t) => (
+        <div className="op" key={t.id}>
+          <button
+            className="link op-line"
+            aria-expanded={editing === t.id}
+            onClick={() => setEditing(editing === t.id ? null : t.id)}
+          >
+            <span className="muted small num">
+              {dayLabel(t.booked_on).slice(0, 5)}
+            </span>
+            <span className="op-label">{t.label}</span>
+            <span className={`num op-amount ${t.amount > 0 ? "good" : ""}`}>
+              {t.amount > 0 ? "+" : ""}
+              {money(t.amount)}
+            </span>
+          </button>
+          {editing === t.id && (
+            <select
+              className="pill"
+              aria-label={`Catégorie de ${t.label}`}
+              value={t.category_id ?? ""}
+              onChange={(e) =>
+                void update("transactions", t.id, {
+                  is_transfer: e.target.value === "transfer",
+                  category_id:
+                    e.target.value === "transfer" ? null : e.target.value,
+                })
+              }
+            >
+              <option value="transfer">↔ Virement interne</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      ))}
+      <p className="muted small" style={{ margin: "6px 0" }}>
+        Touche une opération pour changer sa catégorie.
+      </p>
+    </div>
   );
 }
 
