@@ -1,11 +1,14 @@
 import { useState, type FormEvent } from "react";
-import { supabase } from "../supabase";
+import { appUrl, linkError, supabase } from "../supabase";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [signup, setSignup] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(
+    linkError &&
+      "Ce lien n'est plus valable (déjà utilisé ou expiré). Connecte-toi, ou redemande un mail.",
+  );
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: FormEvent) => {
@@ -13,13 +16,37 @@ export default function Login() {
     setBusy(true);
     setMessage(null);
     const { data, error } = signup
-      ? await supabase.auth.signUp({ email, password })
+      ? await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: appUrl },
+        })
       : await supabase.auth.signInWithPassword({ email, password });
-    if (error) setMessage(error.message);
-    else if (signup && !data.session)
+    if (error) {
       setMessage(
-        "Compte créé : confirme ton adresse via le mail reçu, puis connecte-toi.",
+        error.code === "invalid_credentials"
+          ? "Adresse mail ou mot de passe incorrect."
+          : error.message,
       );
+    } else if (signup && !data.session) {
+      setMessage(
+        "Si cette adresse n'a pas encore de compte, un mail de confirmation vient de partir : clique sur son lien. Si tu as déjà un compte, connecte-toi ou utilise « Mot de passe oublié ».",
+      );
+    }
+    setBusy(false);
+  };
+
+  const forgot = async () => {
+    if (!email) return setMessage("Saisis d'abord ton adresse mail.");
+    setBusy(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: appUrl,
+    });
+    setMessage(
+      error
+        ? error.message
+        : "Si un compte existe pour cette adresse, un mail vient de partir : son lien te ramènera ici pour choisir un nouveau mot de passe.",
+    );
     setBusy(false);
   };
 
@@ -52,6 +79,16 @@ export default function Login() {
         <button disabled={busy}>
           {signup ? "Créer mon compte" : "Se connecter"}
         </button>
+        {!signup && (
+          <button
+            type="button"
+            className="ghost"
+            disabled={busy}
+            onClick={() => void forgot()}
+          >
+            Mot de passe oublié
+          </button>
+        )}
         <button
           type="button"
           className="ghost"

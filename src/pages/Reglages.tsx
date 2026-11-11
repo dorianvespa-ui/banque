@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useData } from "../data";
+import { PasswordForm } from "./Password";
 import type { Account, AccountKind, Scope } from "../types";
 
 export default function Reglages() {
@@ -9,6 +10,10 @@ export default function Reglages() {
       <Accounts />
       <Categories />
       <Rules />
+      <section className="card">
+        <h2>Mot de passe</h2>
+        <PasswordForm />
+      </section>
     </>
   );
 }
