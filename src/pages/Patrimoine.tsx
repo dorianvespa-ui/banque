@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { latest } from "../budget";
+import { latest, netWorth } from "../budget";
 import { useData } from "../data";
 import {
   currentMonth,
@@ -17,78 +17,68 @@ import {
   type Balance,
 } from "../types";
 
+const KIND_ICON: Record<AccountKind, [string, number]> = {
+  courant: ["💳", 225],
+  epargne: ["🐷", 340],
+  placement: ["📈", 150],
+};
+
 export default function Patrimoine() {
   const { accounts, balances } = useData();
   const now = today();
 
-  const mine = (a: Account, until: string) =>
-    (latest(balances, a.id, until)?.amount ?? 0) * a.share;
-  const total = accounts.reduce((sum, a) => sum + mine(a, now), 0);
+  const mine = (a: Account) =>
+    (latest(balances, a.id, now)?.amount ?? 0) * a.share;
+  const total = netWorth(accounts, balances, now);
 
-  const months = Array.from({ length: 12 }, (_, i) =>
+  const series = Array.from({ length: 12 }, (_, i) =>
     shiftMonth(currentMonth(), i - 11),
-  );
-  const series = months.map((m) => ({
+  ).map((m) => ({
     month: m,
     // « AAAA-MM-31 » borne la fin du mois en comparaison de chaînes, même pour les mois plus courts.
-    total: accounts.reduce((sum, a) => sum + mine(a, `${m}-31`), 0),
+    total: netWorth(accounts, balances, `${m}-31`),
   }));
 
   const kinds = Object.keys(KIND_LABEL) as AccountKind[];
 
   return (
     <>
-      <h1>Patrimoine</h1>
-      <div className="tiles">
-        <div className="tile">
-          <span className="muted small">Total (ma part)</span>
-          <strong>{money0(total)}</strong>
-        </div>
-        {kinds.map((k) => (
-          <div className="tile" key={k}>
-            <span className="muted small">{KIND_LABEL[k]}</span>
-            <strong>
-              {money0(
-                accounts
-                  .filter((a) => a.kind === k)
-                  .reduce((s, a) => s + mine(a, now), 0),
-              )}
-            </strong>
-          </div>
-        ))}
+      <div className="page-head">
+        <h1>Patrimoine</h1>
       </div>
 
-      {balances.length > 0 && (
-        <section className="card">
-          <h2>Évolution sur 12 mois</h2>
+      <section className="card hero">
+        <h2>Total (ma part)</h2>
+        <span className="amount">{money0(total)}</span>
+        {balances.length > 0 ? (
           <Chart series={series} />
-        </section>
-      )}
+        ) : (
+          <p className="muted" style={{ margin: "8px 0 0" }}>
+            Saisis le solde de chaque compte ci-dessous pour démarrer le suivi.
+          </p>
+        )}
+      </section>
 
       {kinds.map((k) => {
         const list = accounts.filter((a) => a.kind === k);
         if (!list.length) return null;
         return (
           <section className="card" key={k}>
-            <h2>{KIND_LABEL[k]}</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Compte</th>
-                  <th className="num">Dernier solde</th>
-                  <th className="num">Nouveau solde</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((a) => (
-                  <AccountRow
-                    key={a.id}
-                    account={a}
-                    last={latest(balances, a.id, now)}
-                  />
-                ))}
-              </tbody>
-            </table>
+            <div className="card-head">
+              <h2>{KIND_LABEL[k]}</h2>
+              <strong className="num">
+                {money0(list.reduce((s, a) => s + mine(a), 0))}
+              </strong>
+            </div>
+            <div className="rows">
+              {list.map((a) => (
+                <AccountRow
+                  key={a.id}
+                  account={a}
+                  last={latest(balances, a.id, now)}
+                />
+              ))}
+            </div>
           </section>
         );
       })}
@@ -104,61 +94,75 @@ function AccountRow({
   last: Balance | undefined;
 }) {
   const { setBalance } = useData();
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState<string | null>(null);
+  const [emoji, hue] = KIND_ICON[account.kind];
 
   const save = async () => {
-    const n = Number(draft.replace(/\s/g, "").replace(",", "."));
-    if (draft.trim() === "" || !Number.isFinite(n)) return;
-    await setBalance(account.id, today(), n);
-    setDraft("");
+    const text = draft ?? "";
+    const n = Number(text.replace(/\s/g, "").replace(",", "."));
+    if (text.trim() !== "" && Number.isFinite(n))
+      await setBalance(account.id, today(), n);
+    setDraft(null);
   };
 
   return (
-    <tr>
-      <td>
-        {account.bank} · {account.name}
-        {account.share < 1 && (
-          <div className="muted small">
-            Ma part : {Math.round(account.share * 100)} %
-          </div>
-        )}
-      </td>
-      <td className="num">
-        {last ? money(last.amount) : "—"}
-        {last && <div className="muted small">au {dayLabel(last.as_of)}</div>}
-      </td>
-      <td className="num nowrap">
-        <input
-          className="limit"
-          inputMode="decimal"
-          placeholder="Solde du jour"
-          aria-label={`Nouveau solde ${account.name}`}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && void save()}
-        />{" "}
+    <div className="row">
+      <span
+        className="cat-icon"
+        style={{ "--hue": hue } as React.CSSProperties}
+        aria-hidden="true"
+      >
+        {emoji}
+      </span>
+      <div className="main">
+        <div className="title">{account.name}</div>
+        <div className="muted small">
+          {account.bank}
+          {account.share < 1 &&
+            ` · ma part ${Math.round(account.share * 100)} %`}
+          {last && ` · au ${dayLabel(last.as_of)}`}
+        </div>
+      </div>
+      {draft === null ? (
         <button
-          className="small"
-          disabled={!draft.trim()}
-          onClick={() => void save()}
+          className="ghost small num"
+          aria-label={`Modifier le solde ${account.name}`}
+          onClick={() => setDraft("")}
         >
-          OK
+          {last ? money(last.amount) : "Saisir"}
         </button>
-      </td>
-    </tr>
+      ) : (
+        <span style={{ display: "flex", gap: 6 }}>
+          <input
+            className="limit"
+            style={{ width: "6.5em" }}
+            inputMode="decimal"
+            autoFocus
+            placeholder="Solde"
+            aria-label={`Nouveau solde ${account.name}`}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void save()}
+          />
+          <button className="small" onClick={() => void save()}>
+            OK
+          </button>
+        </span>
+      )}
+    </div>
   );
 }
 
 function Chart({ series }: { series: { month: string; total: number }[] }) {
   const W = 600;
-  const H = 160;
+  const H = 110;
   const values = series.map((s) => s.total);
-  const min = Math.min(...values, 0);
-  const max = Math.max(...values, 1);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
   const x = (i: number) => (i / (series.length - 1)) * W;
-  const y = (v: number) => H - ((v - min) / (max - min)) * (H - 10) - 5;
+  const y = (v: number) => H - 14 - ((v - min) / span) * (H - 34);
   const points = series.map((s, i) => `${x(i)},${y(s.total)}`).join(" ");
-  const last = series[series.length - 1];
 
   return (
     <figure className="chart">
@@ -166,17 +170,11 @@ function Chart({ series }: { series: { month: string; total: number }[] }) {
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
         role="img"
-        aria-label="Évolution du patrimoine"
+        aria-label={`Évolution du patrimoine de ${monthLabel(series[0].month)} à ${monthLabel(series[series.length - 1].month)}`}
       >
         <polygon points={`0,${H} ${points} ${W},${H}`} className="area" />
         <polyline points={points} className="line" />
       </svg>
-      <figcaption className="muted small">
-        <span>{monthLabel(series[0].month)}</span>
-        <span>
-          {monthLabel(last.month)} : {money0(last.total)}
-        </span>
-      </figcaption>
     </figure>
   );
 }

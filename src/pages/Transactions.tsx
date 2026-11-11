@@ -1,15 +1,15 @@
 import { useState } from "react";
+import { budgetMonth } from "../budget";
 import { decodeFile, parseStatement } from "../csv";
 import { useData } from "../data";
-import { budgetMonth } from "../budget";
-import { dayLabel, money, monthLabel } from "../format";
+import { longDay, money, monthLabel } from "../format";
 import type { Tx } from "../types";
+import { CatIcon } from "../ui";
 
-const PAGE = 200;
+const PAGE = 150;
 
 export default function Transactions() {
-  const data = useData();
-  const { accounts, transactions } = data;
+  const { accounts, categories, transactions } = useData();
   const [accountId, setAccountId] = useState("");
   const [month, setMonth] = useState("");
   const [search, setSearch] = useState("");
@@ -24,95 +24,114 @@ export default function Transactions() {
       (!q || t.label.toLowerCase().includes(q)) &&
       (!onlyTodo || (!t.category_id && !t.is_transfer)),
   );
+  const todo = transactions.filter(
+    (t) => !t.category_id && !t.is_transfer,
+  ).length;
   const accountName = new Map(
     accounts.map((a) => [a.id, `${a.bank} · ${a.name}`]),
   );
+  const shifted = new Set(
+    categories.filter((c) => c.shift_next_month).map((c) => c.id),
+  );
+
+  // Regroupe les opérations affichées par jour (elles arrivent déjà triées par date).
+  const days: { date: string; txs: Tx[] }[] = [];
+  for (const t of rows.slice(0, shown)) {
+    const last = days[days.length - 1];
+    if (last?.date === t.booked_on) last.txs.push(t);
+    else days.push({ date: t.booked_on, txs: [t] });
+  }
 
   return (
     <>
-      <h1>Opérations</h1>
+      <div className="page-head">
+        <h1>Opérations</h1>
+      </div>
       <Import />
 
-      <section className="card">
-        <div className="filters">
-          <select
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-            aria-label="Compte"
-          >
-            <option value="">Tous les comptes</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {accountName.get(a.id)}
-              </option>
-            ))}
-          </select>
-          <input
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            aria-label="Mois"
-          />
-          <input
-            placeholder="Rechercher un libellé"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={onlyTodo}
-              onChange={(e) => setOnlyTodo(e.target.checked)}
-            />
-            À classer
-          </label>
-        </div>
+      <div className="filters">
+        <input
+          type="search"
+          placeholder="Rechercher un libellé"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <select
+          value={accountId}
+          onChange={(e) => setAccountId(e.target.value)}
+          aria-label="Compte"
+        >
+          <option value="">Tous les comptes</option>
+          {accounts.map((a) => (
+            <option key={a.id} value={a.id}>
+              {accountName.get(a.id)}
+            </option>
+          ))}
+        </select>
+        <input
+          type="month"
+          value={month}
+          onChange={(e) => setMonth(e.target.value)}
+          aria-label="Mois"
+        />
+        <button
+          className={onlyTodo ? "small" : "small ghost"}
+          aria-pressed={onlyTodo}
+          onClick={() => setOnlyTodo(!onlyTodo)}
+        >
+          À classer{todo > 0 ? ` (${todo})` : ""}
+        </button>
+      </div>
 
-        {rows.length === 0 ? (
-          <p className="muted">
-            Aucune opération. Importe un relevé ci-dessus pour commencer.
-          </p>
-        ) : (
-          <div className="scroll">
-            <table className="tx">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Libellé</th>
-                  <th className="num">Montant</th>
-                  <th>Catégorie</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.slice(0, shown).map((t) => (
-                  <Row
-                    key={t.id}
-                    tx={t}
-                    account={accountName.get(t.account_id) ?? ""}
-                  />
-                ))}
-              </tbody>
-            </table>
+      {rows.length === 0 && (
+        <p className="muted" style={{ textAlign: "center", marginTop: 32 }}>
+          {transactions.length === 0
+            ? "Aucune opération. Importe un relevé pour commencer."
+            : "Aucune opération ne correspond à ces filtres."}
+        </p>
+      )}
+
+      {days.map((d) => (
+        <section key={d.date}>
+          <div className="day">{longDay(d.date)}</div>
+          <div className="card rows" style={{ margin: 0 }}>
+            {d.txs.map((t) => (
+              <Row
+                key={t.id}
+                tx={t}
+                account={accountName.get(t.account_id) ?? ""}
+                counted={budgetMonth(t, shifted)}
+              />
+            ))}
           </div>
-        )}
-        {rows.length > shown && (
-          <button className="ghost" onClick={() => setShown(shown + PAGE)}>
-            Afficher plus ({rows.length - shown} restantes)
-          </button>
-        )}
-      </section>
+        </section>
+      ))}
+
+      {rows.length > shown && (
+        <button
+          className="ghost"
+          style={{ width: "100%", marginTop: 16 }}
+          onClick={() => setShown(shown + PAGE)}
+        >
+          Afficher plus ({rows.length - shown} restantes)
+        </button>
+      )}
     </>
   );
 }
 
-function Row({ tx, account }: { tx: Tx; account: string }) {
+function Row({
+  tx,
+  account,
+  counted,
+}: {
+  tx: Tx;
+  account: string;
+  counted: string;
+}) {
   const { categories, update, insert, remove } = useData();
-  const counted = budgetMonth(
-    tx,
-    new Set(categories.filter((c) => c.shift_next_month).map((c) => c.id)),
-  );
 
+  const category = categories.find((c) => c.id === tx.category_id);
   const value = tx.is_transfer ? "transfer" : (tx.category_id ?? "");
   const change = (v: string) =>
     void update("transactions", tx.id, {
@@ -138,26 +157,36 @@ function Row({ tx, account }: { tx: Tx; account: string }) {
   };
 
   return (
-    <tr>
-      <td className="nowrap date">{dayLabel(tx.booked_on)}</td>
-      <td>
-        {tx.label}
+    <div className="row">
+      {tx.is_transfer ? (
+        <span
+          className="cat-icon"
+          style={{ "--hue": 225 } as React.CSSProperties}
+        >
+          ↔
+        </span>
+      ) : (
+        <CatIcon name={category?.name ?? null} />
+      )}
+      <div className="main">
+        <div className="title">{tx.label}</div>
         <div className="muted small">
-          <span className="only-mobile">{dayLabel(tx.booked_on)} · </span>
           {account}
           {counted !== tx.booked_on.slice(0, 7) && (
             <> · compté en {monthLabel(counted)}</>
           )}
         </div>
-      </td>
-      <td className={`num nowrap ${tx.amount > 0 ? "good" : ""}`}>
+      </div>
+      <span className={`value ${tx.amount > 0 ? "good" : ""}`}>
+        {tx.amount > 0 ? "+" : ""}
         {money(tx.amount)}
-      </td>
-      <td>
+      </span>
+      <div className="wide tx-tools">
         <select
           value={value}
           onChange={(e) => change(e.target.value)}
-          className={value ? "" : "todo"}
+          className={value ? "pill" : "pill todo"}
+          aria-label="Catégorie"
         >
           <option value="">À classer</option>
           <option value="transfer">↔ Virement interne</option>
@@ -180,8 +209,7 @@ function Row({ tx, account }: { tx: Tx; account: string }) {
               ))}
           </optgroup>
         </select>
-      </td>
-      <td className="nowrap">
+        <span style={{ flex: 1 }} />
         {value && (
           <button
             className="ghost small"
@@ -194,6 +222,7 @@ function Row({ tx, account }: { tx: Tx; account: string }) {
         <button
           className="ghost small"
           title="Supprimer cette opération"
+          aria-label="Supprimer cette opération"
           onClick={() =>
             confirm("Supprimer cette opération ?") &&
             void remove("transactions", tx.id)
@@ -201,8 +230,8 @@ function Row({ tx, account }: { tx: Tx; account: string }) {
         >
           ✕
         </button>
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 }
 
@@ -235,12 +264,12 @@ function Import() {
   };
 
   return (
-    <section className="card">
-      <h2>Importer un relevé (CSV)</h2>
-      <p className="muted">
-        Télécharge le relevé depuis l'appli de ta banque au format CSV, choisis
-        le compte, puis dépose le fichier. Réimporter une période déjà chargée
-        ne crée pas de doublons.
+    <details className="card">
+      <summary>Importer un relevé (CSV)</summary>
+      <p className="muted small" style={{ marginTop: 8 }}>
+        Télécharge le relevé depuis ta banque au format CSV, choisis le compte,
+        puis sélectionne le fichier. Réimporter une période déjà chargée ne crée
+        pas de doublons.
       </p>
       <div className="filters">
         <select
@@ -254,17 +283,17 @@ function Import() {
             </option>
           ))}
         </select>
-        <input
-          type="file"
-          accept=".csv,text/csv"
-          disabled={busy || !target}
-          onChange={(e) => {
-            void onFile(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
       </div>
+      <input
+        type="file"
+        accept=".csv,text/csv"
+        disabled={busy || !target}
+        onChange={(e) => {
+          void onFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
       {message && <p className="notice">{message}</p>}
-    </section>
+    </details>
   );
 }
