@@ -18,9 +18,11 @@ arrivent par import CSV.
 
 ## Installation
 
-1. Appliquer `supabase/migrations/0001_init.sql` sur le projet Supabase.
-2. Copier `.env.example` en `.env` et renseigner l'adresse et la clé publique du projet.
-3. Lancer :
+La base est déjà installée dans le projet Supabase « My Auditmed » (tables préfixées `budget_`,
+à côté de celles de l'autre appli). Les comptes utilisateurs sont communs aux deux applis.
+
+1. Copier `.env.example` en `.env`.
+2. Lancer :
 
 ```bash
 npm install
@@ -30,5 +32,4 @@ npm run build   # version de production dans dist/
 ```
 
 Les données sont protégées par la sécurité au niveau des lignes : chaque utilisateur ne voit que
-les siennes. Une fois ton compte créé, désactive les inscriptions dans Supabase
-(Authentication → Sign In / Providers) pour que l'appli reste privée.
+les siennes. Pour réinstaller la base ailleurs, appliquer `supabase/migrations/0001_init.sql`.

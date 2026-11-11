@@ -61,7 +61,7 @@ async function fetchAll<T extends TableName>(table: T): Promise<Row<T>[]> {
   const page = 1000;
   for (let from = 0; ; from += page) {
     const { data, error } = await supabase
-      .from(table)
+      .from(`budget_${table}`)
       .select("*")
       .order(ORDER[table], { ascending: table !== "transactions" })
       .order("id")
@@ -163,14 +163,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       reload,
 
       async insert(table, rows) {
-        await run(supabase.from(table).insert(rows as never[]));
+        await run(supabase.from(`budget_${table}`).insert(rows as never[]));
         await reload();
       },
 
       async update(table, id, patch) {
         await run(
           supabase
-            .from(table)
+            .from(`budget_${table}`)
             .update(patch as never)
             .eq("id", id),
         );
@@ -181,7 +181,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       },
 
       async remove(table, id) {
-        await run(supabase.from(table).delete().eq("id", id));
+        await run(supabase.from(`budget_${table}`).delete().eq("id", id));
         // Une suppression peut en entraîner d'autres en cascade : on relit tout.
         await reload();
       },
@@ -190,7 +190,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (limit === null) {
           await run(
             supabase
-              .from("budgets")
+              .from("budget_budgets")
               .delete()
               .eq("scope", scope)
               .eq("category_id", categoryId),
@@ -198,7 +198,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         } else {
           await run(
             supabase
-              .from("budgets")
+              .from("budget_budgets")
               .upsert(
                 { scope, category_id: categoryId, monthly_limit: limit },
                 { onConflict: "user_id,scope,category_id" },
@@ -212,7 +212,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       async setBalance(accountId, asOf, amount) {
         await run(
           supabase
-            .from("balances")
+            .from("budget_balances")
             .upsert(
               { account_id: accountId, as_of: asOf, amount },
               { onConflict: "account_id,as_of" },
@@ -236,7 +236,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         for (let i = 0; i < rows.length; i += 500) {
           const data = await run(
             supabase
-              .from("transactions")
+              .from("budget_transactions")
               .upsert(rows.slice(i, i + 500), {
                 onConflict: "account_id,external_id",
                 ignoreDuplicates: true,
@@ -261,7 +261,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           for (let i = 0; i < ids.length; i += 200) {
             await run(
               supabase
-                .from("transactions")
+                .from("budget_transactions")
                 .update({
                   category_id: rule.category_id,
                   is_transfer: rule.is_transfer,
