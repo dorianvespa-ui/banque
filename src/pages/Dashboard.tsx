@@ -3,6 +3,7 @@ import { netWorth, summarize } from "../budget";
 import { useData } from "../data";
 import { currentMonth, money0, monthLabel, shiftMonth, today } from "../format";
 import { SCOPE_LABEL, type Scope } from "../types";
+import { CatIcon, MonthNav, Ring } from "../ui";
 
 export default function Dashboard() {
   const data = useData();
@@ -12,7 +13,7 @@ export default function Dashboard() {
     (t) => !t.category_id && !t.is_transfer,
   ).length;
   const worth = netWorth(data.accounts, data.balances, today());
-  const worthBefore = netWorth(
+  const before = netWorth(
     data.accounts,
     data.balances,
     `${shiftMonth(currentMonth(), -1)}-31`,
@@ -20,60 +21,44 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="title-row">
+      <div className="page-head">
         <h1>Tableau de bord</h1>
-        <div className="month-nav">
-          <button
-            className="ghost"
-            aria-label="Mois précédent"
-            onClick={() => setMonth(shiftMonth(month, -1))}
-          >
-            ‹
-          </button>
-          <span>{monthLabel(month)}</span>
-          <button
-            className="ghost"
-            aria-label="Mois suivant"
-            onClick={() => setMonth(shiftMonth(month, 1))}
-          >
-            ›
-          </button>
-        </div>
+        <MonthNav month={month} onChange={setMonth} />
       </div>
 
+      <a className="card hero" href="#patrimoine">
+        <h2>Patrimoine</h2>
+        {data.balances.length === 0 ? (
+          <span className="muted">
+            Saisis les soldes de tes comptes pour suivre ton patrimoine ›
+          </span>
+        ) : (
+          <>
+            <span className="amount">{money0(worth)}</span>
+            {before !== 0 && (
+              <span className="delta">
+                {worth - before >= 0 ? "▲ +" : "▼ "}
+                {money0(worth - before)} depuis fin{" "}
+                {monthLabel(shiftMonth(currentMonth(), -1), true)}
+              </span>
+            )}
+          </>
+        )}
+      </a>
+
       {todo > 0 && (
-        <p className="notice">
-          {todo} opération{todo > 1 ? "s" : ""} à classer.{" "}
-          <a href="#transactions">Les classer</a>
-        </p>
+        <a className="notice" href="#transactions">
+          <strong>
+            {todo} opération{todo > 1 ? "s" : ""} à classer
+          </strong>{" "}
+          pour un budget à jour ›
+        </a>
       )}
 
       <div className="duo">
         <ScopeCard scope="perso" month={month} />
         <ScopeCard scope="joint" month={month} />
       </div>
-
-      <a className="card link-card" href="#patrimoine">
-        <h2>Patrimoine</h2>
-        {data.balances.length === 0 ? (
-          <p className="muted">
-            Saisis les soldes de tes comptes pour suivre ton patrimoine.
-          </p>
-        ) : (
-          <p className="big">
-            <strong>{money0(worth)}</strong>
-            {worthBefore !== 0 && (
-              <span
-                className={`small ${worth - worthBefore < 0 ? "bad" : "good"}`}
-              >
-                {worth - worthBefore >= 0 ? "+" : ""}
-                {money0(worth - worthBefore)} depuis fin{" "}
-                {monthLabel(shiftMonth(currentMonth(), -1), true)}
-              </span>
-            )}
-          </p>
-        )}
-      </a>
     </>
   );
 }
@@ -85,7 +70,8 @@ function ScopeCard({ scope, month }: { scope: Scope; month: string }) {
   const left = s.planned - s.spent;
 
   const over = s.expenses.filter(
-    (e) => e.limit !== undefined && e.spent > e.limit,
+    // Un dépassement de quelques centimes ne mérite pas une alerte.
+    (e) => e.limit !== undefined && e.spent - e.limit >= 1,
   );
   const top = [...s.expenses]
     .filter((e) => e.spent > 0)
@@ -98,43 +84,49 @@ function ScopeCard({ scope, month }: { scope: Scope; month: string }) {
   const max = Math.max(s.planned, ...history.map((h) => h.spent), 1);
 
   return (
-    <a className="card link-card" href={`#${scope}`}>
-      <h2>{SCOPE_LABEL[scope]}</h2>
-      <p className="big">
-        <strong className={s.planned && left < 0 ? "bad" : ""}>
-          {s.planned ? money0(left) : money0(s.spent)}
-        </strong>
-        <span className="muted small">
-          {s.planned
-            ? left < 0
-              ? `de dépassement sur ${money0(s.planned)}`
-              : `restants sur ${money0(s.planned)}`
-            : "dépensés (aucun plafond défini)"}
-        </span>
-      </p>
-      {s.planned > 0 && (
-        <div className="bar tall">
-          <div
-            className={
-              ratio > 1 ? "fill over" : ratio > 0.85 ? "fill warn" : "fill"
-            }
-            style={{ width: `${Math.min(ratio, 1) * 100}%` }}
-          />
+    <a className="card" href={`#${scope}`}>
+      <div className="card-head">
+        <h2>{SCOPE_LABEL[scope]}</h2>
+        <span className="chev">›</span>
+      </div>
+
+      <div className="gauge">
+        {s.planned > 0 && (
+          <Ring ratio={ratio}>{Math.round(ratio * 100)} %</Ring>
+        )}
+        <div>
+          <span className={`amount ${s.planned && left < 0 ? "bad" : ""}`}>
+            {money0(s.planned ? Math.abs(left) : s.spent)}
+          </span>
+          <span className="muted small">
+            {s.planned
+              ? left < 0
+                ? `de dépassement sur ${money0(s.planned)}`
+                : `restants sur ${money0(s.planned)}`
+              : "dépensés, aucun plafond défini"}
+          </span>
         </div>
-      )}
-      <dl className="pairs">
-        <dt>Revenus</dt>
-        <dd>{money0(s.income)}</dd>
-        <dt>Dépenses</dt>
-        <dd>{money0(s.spent)}</dd>
-        <dt>Solde du mois</dt>
-        <dd className={s.income - s.spent < 0 ? "bad" : "good"}>
-          {money0(s.income - s.spent)}
-        </dd>
-      </dl>
+      </div>
+
+      <div className="stats">
+        <div>
+          <span>Revenus</span>
+          <strong>{money0(s.income)}</strong>
+        </div>
+        <div>
+          <span>Dépenses</span>
+          <strong>{money0(s.spent)}</strong>
+        </div>
+        <div>
+          <span>Solde</span>
+          <strong className={s.income - s.spent < 0 ? "bad" : "good"}>
+            {money0(s.income - s.spent)}
+          </strong>
+        </div>
+      </div>
 
       {over.length > 0 && (
-        <p className="bad small">
+        <p className="alert">
           Plafond dépassé :{" "}
           {over
             .map((e) => `${e.category.name} (+${money0(e.spent - e.limit!)})`)
@@ -145,19 +137,20 @@ function ScopeCard({ scope, month }: { scope: Scope; month: string }) {
       {top.length > 0 && (
         <>
           <h3>Principales dépenses</h3>
-          <dl className="pairs">
+          <div className="rows">
             {top.map((e) => (
-              <div key={e.category.id} style={{ display: "contents" }}>
-                <dt>{e.category.name}</dt>
-                <dd>
+              <div className="row" key={e.category.id}>
+                <CatIcon name={e.category.name} />
+                <span className="title">{e.category.name}</span>
+                <span className="value">
                   {money0(e.spent)}
                   {e.limit !== undefined && (
-                    <span className="muted"> / {money0(e.limit)}</span>
+                    <span className="muted small"> / {money0(e.limit)}</span>
                   )}
-                </dd>
+                </span>
               </div>
             ))}
-          </dl>
+          </div>
         </>
       )}
 
@@ -173,7 +166,7 @@ function ScopeCard({ scope, month }: { scope: Scope; month: string }) {
               style={{ height: `${(h.spent / max) * 100}%` }}
               title={`${monthLabel(h.month)} : ${money0(h.spent)}`}
             />
-            <span className="small muted">{monthLabel(h.month, true)}</span>
+            {monthLabel(h.month, true)}
           </div>
         ))}
       </div>

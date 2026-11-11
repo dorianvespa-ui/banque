@@ -3,6 +3,7 @@ import { summarize } from "../budget";
 import { useData } from "../data";
 import { currentMonth, money, money0, monthLabel, shiftMonth } from "../format";
 import { SCOPE_LABEL, type Scope } from "../types";
+import { Bar, CatIcon, MonthNav, Ring } from "../ui";
 
 export default function Budget({ scope }: { scope: Scope }) {
   const data = useData();
@@ -10,140 +11,117 @@ export default function Budget({ scope }: { scope: Scope }) {
   const [month, setMonth] = useState(currentMonth);
 
   const scopeAccounts = accounts.filter((a) => a.budget_scope === scope);
-  const {
-    income,
-    spent,
-    planned,
-    carried,
-    uncategorized,
-    uncategorizedCount,
-    expenses,
-  } = summarize(scope, month, data);
+  const s = summarize(scope, month, data);
+  const ratio = s.planned ? s.spent / s.planned : 0;
+  const left = s.planned - s.spent;
 
   const history = Array.from({ length: 6 }, (_, i) =>
     shiftMonth(month, i - 5),
   ).map((m) => ({ month: m, spent: summarize(scope, m, data).spent }));
-  const historyMax = Math.max(planned, ...history.map((h) => h.spent), 1);
+  const historyMax = Math.max(s.planned, ...history.map((h) => h.spent), 1);
 
   return (
     <>
-      <div className="title-row">
-        <div>
-          <h1>Budget {SCOPE_LABEL[scope].toLowerCase()}</h1>
-          <p className="muted">
-            {scopeAccounts.length
-              ? scopeAccounts.map((a) => `${a.bank} · ${a.name}`).join(", ")
-              : "Aucun compte rattaché à ce budget (voir Réglages)."}
+      <div className="page-head">
+        <h1>Budgets</h1>
+        <MonthNav month={month} onChange={setMonth} />
+      </div>
+
+      <div className="segmented">
+        {(Object.keys(SCOPE_LABEL) as Scope[]).map((sc) => (
+          <a key={sc} href={`#${sc}`} className={sc === scope ? "active" : ""}>
+            {SCOPE_LABEL[sc]}
+          </a>
+        ))}
+      </div>
+
+      <section className="card">
+        <div className="gauge">
+          {s.planned > 0 && (
+            <Ring ratio={ratio} size={92}>
+              {Math.round(ratio * 100)} %
+            </Ring>
+          )}
+          <div>
+            <span className={`amount ${s.planned && left < 0 ? "bad" : ""}`}>
+              {money0(s.planned ? Math.abs(left) : s.spent)}
+            </span>
+            <span className="muted small">
+              {s.planned
+                ? left < 0
+                  ? `de dépassement sur ${money0(s.planned)} prévus`
+                  : `restants sur ${money0(s.planned)} prévus`
+                : "dépensés, aucun plafond défini"}
+            </span>
+          </div>
+        </div>
+        <div className="stats">
+          <div>
+            <span>Revenus</span>
+            <strong>{money0(s.income)}</strong>
+          </div>
+          <div>
+            <span>Dépenses</span>
+            <strong>{money0(s.spent)}</strong>
+          </div>
+          <div>
+            <span>Solde</span>
+            <strong className={s.income - s.spent < 0 ? "bad" : "good"}>
+              {money0(s.income - s.spent)}
+            </strong>
+          </div>
+        </div>
+        {s.carried !== 0 && (
+          <p className="muted small" style={{ margin: "12px 0 0" }}>
+            Revenus : dont {money0(s.carried)} reçus fin{" "}
+            {monthLabel(shiftMonth(month, -1), true).replace(/\.$/, "")}.
           </p>
-        </div>
-        <div className="month-nav">
-          <button
-            className="ghost"
-            aria-label="Mois précédent"
-            onClick={() => setMonth(shiftMonth(month, -1))}
-          >
-            ‹
-          </button>
-          <span>{monthLabel(month)}</span>
-          <button
-            className="ghost"
-            aria-label="Mois suivant"
-            onClick={() => setMonth(shiftMonth(month, 1))}
-          >
-            ›
-          </button>
-        </div>
-      </div>
+        )}
+      </section>
 
-      <div className="tiles">
-        <Tile
-          label="Revenus"
-          value={money0(income)}
-          hint={
-            carried
-              ? `dont ${money0(carried)} reçus fin ${monthLabel(shiftMonth(month, -1), true)}`
-              : undefined
-          }
-        />
-        <Tile label="Dépenses" value={money0(spent)} />
-        <Tile
-          label="Reste sur le budget"
-          value={planned ? money0(planned - spent) : "—"}
-          tone={planned && spent > planned ? "bad" : undefined}
-          hint={
-            planned ? `sur ${money0(planned)} prévus` : "Aucun plafond défini"
-          }
-        />
-        <Tile
-          label="Solde du mois"
-          value={money0(income - spent)}
-          tone={income - spent < 0 ? "bad" : "good"}
-        />
-      </div>
-
-      {uncategorizedCount > 0 && (
-        <p className="notice">
-          {uncategorizedCount} opération{uncategorizedCount > 1 ? "s" : ""} non
-          classée
-          {uncategorizedCount > 1 ? "s" : ""} ce mois-ci ({money(uncategorized)}{" "}
-          de dépenses). <a href="#transactions">Les classer</a>
-        </p>
+      {s.uncategorizedCount > 0 && (
+        <a className="notice" href="#transactions">
+          <strong>
+            {s.uncategorizedCount} opération
+            {s.uncategorizedCount > 1 ? "s" : ""} à classer
+          </strong>{" "}
+          ce mois-ci ({money(s.uncategorized)} de dépenses) ›
+        </a>
       )}
 
       <section className="card">
-        <h2>Dépenses par catégorie</h2>
-        <div className="scroll">
-          <table className="budget">
-            <thead>
-              <tr>
-                <th>Catégorie</th>
-                <th className="bar-col" />
-                <th className="num">Dépensé</th>
-                <th className="num">Plafond</th>
-                <th className="num">Reste</th>
-              </tr>
-            </thead>
-            <tbody>
-              {expenses.map(({ category: c, spent: value, limit }) => {
-                const ratio = limit ? value / limit : 0;
-                return (
-                  <tr key={c.id}>
-                    <td>{c.name}</td>
-                    <td className="bar-col">
-                      {limit !== undefined && (
-                        <div className="bar">
-                          <div
-                            className={
-                              ratio > 1
-                                ? "fill over"
-                                : ratio > 0.85
-                                  ? "fill warn"
-                                  : "fill"
-                            }
-                            style={{
-                              width: `${Math.min(Math.max(ratio, 0), 1) * 100}%`,
-                            }}
-                          />
-                        </div>
-                      )}
-                    </td>
-                    <td className="num">{money(value)}</td>
-                    <td className="num">
-                      <LimitInput
-                        value={limit}
-                        onChange={(v) => void setBudget(scope, c.id, v)}
-                      />
-                    </td>
-                    <td
-                      className={`num ${limit !== undefined && value > limit ? "bad" : ""}`}
-                    >
-                      {limit !== undefined ? money(limit - value) : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="card-head">
+          <h2>Dépenses par catégorie</h2>
+          <span className="muted small">Plafond</span>
+        </div>
+        <div className="rows">
+          {s.expenses.map(({ category: c, spent, limit }) => (
+            <div className="row" key={c.id}>
+              <CatIcon name={c.name} />
+              <div className="main">
+                <div className="title">{c.name}</div>
+                <div
+                  className={`small num ${limit !== undefined && spent > limit ? "bad" : "muted"}`}
+                >
+                  {money(spent)}
+                  {limit !== undefined &&
+                    (spent > limit
+                      ? ` · dépassé de ${money0(spent - limit)}`
+                      : ` · reste ${money0(limit - spent)}`)}
+                </div>
+              </div>
+              <LimitInput
+                value={limit}
+                label={c.name}
+                onChange={(v) => void setBudget(scope, c.id, v)}
+              />
+              {limit !== undefined && (
+                <div className="wide">
+                  <Bar ratio={limit ? spent / limit : spent > 0 ? 2 : 0} />
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </section>
 
@@ -152,44 +130,37 @@ export default function Budget({ scope }: { scope: Scope }) {
         <div className="history">
           {history.map((h) => (
             <div key={h.month} className="history-col">
-              <span className="muted small">{money0(h.spent)}</span>
+              <span className="num">{money0(h.spent)}</span>
               <div
                 className={
-                  planned && h.spent > planned
+                  s.planned && h.spent > s.planned
                     ? "history-bar over"
                     : "history-bar"
                 }
                 style={{ height: `${(h.spent / historyMax) * 100}%` }}
               />
-              <span className="small">{monthLabel(h.month, true)}</span>
+              {monthLabel(h.month, true)}
             </div>
           ))}
         </div>
       </section>
-    </>
-  );
-}
 
-function Tile(props: {
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "good" | "bad";
-}) {
-  return (
-    <div className="tile">
-      <span className="muted small">{props.label}</span>
-      <strong className={props.tone}>{props.value}</strong>
-      {props.hint && <span className="muted small">{props.hint}</span>}
-    </div>
+      <p className="muted small" style={{ textAlign: "center" }}>
+        {scopeAccounts.length
+          ? scopeAccounts.map((a) => `${a.bank} · ${a.name}`).join("  ·  ")
+          : "Aucun compte rattaché à ce budget (voir Réglages)."}
+      </p>
+    </>
   );
 }
 
 function LimitInput({
   value,
+  label,
   onChange,
 }: {
   value: number | undefined;
+  label: string;
   onChange: (v: number | null) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
@@ -206,7 +177,7 @@ function LimitInput({
       className="limit"
       inputMode="decimal"
       placeholder="—"
-      aria-label="Plafond mensuel"
+      aria-label={`Plafond mensuel ${label}`}
       value={draft ?? (value === undefined ? "" : String(value))}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}

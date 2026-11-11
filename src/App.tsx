@@ -10,20 +10,29 @@ import Patrimoine from "./pages/Patrimoine";
 import Reglages from "./pages/Reglages";
 import Transactions from "./pages/Transactions";
 import { configured, supabase } from "./supabase";
+import { NavIcons } from "./ui";
 
-const TABS = [
-  { id: "accueil", label: "Tableau de bord" },
-  { id: "perso", label: "Budget perso" },
-  { id: "joint", label: "Budget joint" },
-  { id: "transactions", label: "Opérations" },
-  { id: "patrimoine", label: "Patrimoine" },
-  { id: "reglages", label: "Réglages" },
+const ROUTES = [
+  "accueil",
+  "perso",
+  "joint",
+  "transactions",
+  "patrimoine",
+  "reglages",
 ] as const;
-type TabId = (typeof TABS)[number]["id"];
+type Route = (typeof ROUTES)[number];
 
-const tabFromHash = (): TabId => {
-  const id = location.hash.slice(1);
-  return TABS.some((t) => t.id === id) ? (id as TabId) : "accueil";
+const TABS: { route: Route; label: string; icon: keyof typeof NavIcons }[] = [
+  { route: "accueil", label: "Accueil", icon: "accueil" },
+  { route: "perso", label: "Budgets", icon: "budgets" },
+  { route: "transactions", label: "Opérations", icon: "transactions" },
+  { route: "patrimoine", label: "Patrimoine", icon: "patrimoine" },
+  { route: "reglages", label: "Réglages", icon: "reglages" },
+];
+
+const routeFromHash = (): Route => {
+  const id = location.hash.slice(1) as Route;
+  return ROUTES.includes(id) ? id : "accueil";
 };
 
 export default function App() {
@@ -63,7 +72,7 @@ export default function App() {
     return (
       <main className="center">
         <div className="card login">
-          <h1>Nouveau mot de passe</h1>
+          <h2>Nouveau mot de passe</h2>
           <PasswordForm onDone={() => setRecovery(false)} />
         </div>
       </main>
@@ -78,51 +87,55 @@ export default function App() {
 
 function Shell() {
   const data = useData();
-  const [tab, setTab] = useState<TabId>(tabFromHash);
+  const [route, setRoute] = useState<Route>(routeFromHash);
 
   useEffect(() => {
-    const onHash = () => setTab(tabFromHash());
+    const onHash = () => {
+      setRoute(routeFromHash());
+      scrollTo(0, 0);
+    };
     addEventListener("hashchange", onHash);
     return () => removeEventListener("hashchange", onHash);
   }, []);
 
+  const isBudget = route === "perso" || route === "joint";
+
   return (
     <>
-      <header className="top">
-        <strong>Mon budget</strong>
-        <nav>
-          {TABS.map((t) => (
-            <a
-              key={t.id}
-              href={`#${t.id}`}
-              className={t.id === tab ? "active" : ""}
-            >
-              {t.label}
-            </a>
-          ))}
-        </nav>
-        <button className="ghost" onClick={() => void supabase.auth.signOut()}>
-          Déconnexion
-        </button>
-      </header>
       <main>
         {data.error && <p className="error">Erreur : {data.error}</p>}
         {data.loading ? (
           <p className="muted">Chargement…</p>
-        ) : data.accounts.length === 0 && tab !== "reglages" ? (
+        ) : data.accounts.length === 0 && route !== "reglages" ? (
           <Onboarding />
-        ) : tab === "accueil" ? (
+        ) : route === "accueil" ? (
           <Dashboard />
-        ) : tab === "perso" || tab === "joint" ? (
-          <Budget key={tab} scope={tab} />
-        ) : tab === "transactions" ? (
+        ) : isBudget ? (
+          <Budget key={route} scope={route} />
+        ) : route === "transactions" ? (
           <Transactions />
-        ) : tab === "patrimoine" ? (
+        ) : route === "patrimoine" ? (
           <Patrimoine />
         ) : (
           <Reglages />
         )}
       </main>
+      <nav className="tabbar">
+        {TABS.map((t) => (
+          <a
+            key={t.route}
+            href={`#${t.route}`}
+            className={
+              t.route === route || (t.route === "perso" && isBudget)
+                ? "active"
+                : ""
+            }
+          >
+            {NavIcons[t.icon]}
+            {t.label}
+          </a>
+        ))}
+      </nav>
     </>
   );
 }

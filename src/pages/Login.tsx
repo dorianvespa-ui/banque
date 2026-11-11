@@ -53,6 +53,7 @@ export default function Login() {
   return (
     <main className="center">
       <form className="card login" onSubmit={(e) => void submit(e)}>
+        <img className="logo" src="./apple-touch-icon.png" alt="" />
         <h1>Mon budget</h1>
         <label>
           Adresse mail

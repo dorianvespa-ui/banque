@@ -39,3 +39,13 @@ export const dayLabel = (date: string) => {
   const [y, m, d] = date.split("-");
   return `${d}/${m}/${y}`;
 };
+
+/** « mardi 10 novembre » */
+export const longDay = (date: string) => {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+};
