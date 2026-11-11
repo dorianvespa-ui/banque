@@ -238,6 +238,7 @@ function Rules() {
   const { rules, categories, insert, remove, applyRules } = useData();
   const [pattern, setPattern] = useState("");
   const [target, setTarget] = useState("transfer");
+  const [exact, setExact] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const categoryName = new Map(categories.map((c) => [c.id, c.name]));
 
@@ -247,6 +248,7 @@ function Rules() {
     void insert("rules", [
       {
         pattern: pattern.trim(),
+        exact,
         is_transfer: target === "transfer",
         category_id: target === "transfer" ? null : target,
       },
@@ -259,36 +261,52 @@ function Rules() {
       <h2>Règles de classement</h2>
       <p className="muted">
         Une règle classe automatiquement, à l'import, toute opération dont le
-        libellé contient le texte indiqué.
+        libellé contient le texte indiqué, ou lui est exactement égal. Si
+        plusieurs règles conviennent, la plus précise l'emporte.
       </p>
       {rules.length > 0 && (
-        <table>
-          <tbody>
-            {rules.map((r) => (
-              <tr key={r.id}>
-                <td>« {r.pattern} »</td>
-                <td>
-                  →{" "}
-                  {r.is_transfer
-                    ? "Virement interne"
-                    : (categoryName.get(r.category_id ?? "") ?? "—")}
-                </td>
-                <td>
-                  <button
-                    className="ghost small"
-                    onClick={() => void remove("rules", r.id)}
-                  >
-                    Supprimer
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <details>
+          <summary>
+            {rules.length} règle{rules.length > 1 ? "s" : ""}
+          </summary>
+          <table>
+            <tbody>
+              {rules.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    {r.exact ? "=" : "contient"} « {r.pattern} »
+                  </td>
+                  <td>
+                    →{" "}
+                    {r.is_transfer
+                      ? "Virement interne"
+                      : (categoryName.get(r.category_id ?? "") ?? "—")}
+                  </td>
+                  <td>
+                    <button
+                      className="ghost small"
+                      onClick={() => void remove("rules", r.id)}
+                    >
+                      Supprimer
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
       )}
       <form className="filters" onSubmit={add}>
+        <select
+          value={exact ? "exact" : "contains"}
+          onChange={(e) => setExact(e.target.value === "exact")}
+          aria-label="Type de règle"
+        >
+          <option value="contains">Le libellé contient</option>
+          <option value="exact">Le libellé est exactement</option>
+        </select>
         <input
-          placeholder="Le libellé contient…"
+          placeholder="Texte du libellé"
           value={pattern}
           onChange={(e) => setPattern(e.target.value)}
         />

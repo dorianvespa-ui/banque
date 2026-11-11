@@ -41,6 +41,8 @@ export interface Tx {
 export interface Rule {
   id: string;
   pattern: string;
+  /** Vrai : le libellé doit être exactement ce texte ; faux : il doit le contenir. */
+  exact: boolean;
   category_id: string | null;
   is_transfer: boolean;
 }

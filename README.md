@@ -5,6 +5,8 @@ opérations bancaires et suivi du patrimoine. Appli web React + Supabase.
 
 ## Fonctionnement
 
+- **Tableau de bord** : vue d'ensemble du mois (reste à dépenser de chaque budget, dépassements,
+  principales dépenses, patrimoine).
 - **Budget perso / Budget joint** : revenus, dépenses et plafonds mensuels par catégorie, pour les
   comptes rattachés à chaque budget. Les virements internes sont exclus.
 - **Opérations** : import des relevés CSV (Revolut, Crédit Agricole), sans doublon en cas de

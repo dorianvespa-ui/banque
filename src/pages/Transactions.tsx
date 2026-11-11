@@ -127,7 +127,13 @@ function Row({ tx, account }: { tx: Tx; account: string }) {
     )?.trim();
     if (pattern)
       void insert("rules", [
-        { pattern, category_id: tx.category_id, is_transfer: tx.is_transfer },
+        {
+          pattern,
+          // Libellé repris tel quel : la règle ne vise que lui.
+          exact: pattern.toLowerCase() === tx.label.toLowerCase(),
+          category_id: tx.category_id,
+          is_transfer: tx.is_transfer,
+        },
       ]);
   };
 
