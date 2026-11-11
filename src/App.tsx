@@ -9,6 +9,7 @@ import { PasswordForm } from "./pages/Password";
 import Patrimoine from "./pages/Patrimoine";
 import Reglages from "./pages/Reglages";
 import Transactions from "./pages/Transactions";
+import Voyages from "./pages/Voyages";
 import { configured, supabase } from "./supabase";
 import { NavIcons } from "./ui";
 
@@ -16,6 +17,7 @@ const ROUTES = [
   "accueil",
   "perso",
   "joint",
+  "voyages",
   "transactions",
   "patrimoine",
   "reglages",
@@ -25,6 +27,7 @@ type Route = (typeof ROUTES)[number];
 const TABS: { route: Route; label: string; icon: keyof typeof NavIcons }[] = [
   { route: "accueil", label: "Accueil", icon: "accueil" },
   { route: "perso", label: "Budgets", icon: "budgets" },
+  { route: "voyages", label: "Voyages", icon: "voyages" },
   { route: "transactions", label: "Opérations", icon: "transactions" },
   { route: "patrimoine", label: "Patrimoine", icon: "patrimoine" },
   { route: "reglages", label: "Réglages", icon: "reglages" },
@@ -112,6 +115,8 @@ function Shell() {
           <Dashboard />
         ) : isBudget ? (
           <Budget key={route} scope={route} />
+        ) : route === "voyages" ? (
+          <Voyages />
         ) : route === "transactions" ? (
           <Transactions />
         ) : route === "patrimoine" ? (

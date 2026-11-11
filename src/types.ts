@@ -35,6 +35,8 @@ export interface Tx {
   label: string;
   category_id: string | null;
   is_transfer: boolean;
+  /** Voyage auquel l'opération est rattachée : elle sort alors des budgets mensuels. */
+  trip_id: string | null;
   external_id: string;
 }
 
@@ -45,6 +47,15 @@ export interface Rule {
   exact: boolean;
   category_id: string | null;
   is_transfer: boolean;
+}
+
+export interface Trip {
+  id: string;
+  name: string;
+  starts_on: string | null;
+  ends_on: string | null;
+  /** Coût net prévu pour moi, remboursements déduits. */
+  budget: number;
 }
 
 export interface Balance {

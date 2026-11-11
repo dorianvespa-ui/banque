@@ -1,17 +1,15 @@
 import { useState } from "react";
-import { netWorth, summarize } from "../budget";
+import { isTodo, netWorth, summarize, tripSpent } from "../budget";
 import { useData } from "../data";
 import { currentMonth, money0, monthLabel, shiftMonth, today } from "../format";
 import { SCOPE_LABEL, type Scope } from "../types";
-import { CatIcon, MonthNav, Ring } from "../ui";
+import { Bar, CatIcon, MonthNav, Ring } from "../ui";
 
 export default function Dashboard() {
   const data = useData();
   const [month, setMonth] = useState(currentMonth);
 
-  const todo = data.transactions.filter(
-    (t) => !t.category_id && !t.is_transfer,
-  ).length;
+  const todo = data.transactions.filter(isTodo).length;
   const worth = netWorth(data.accounts, data.balances, today());
   const before = netWorth(
     data.accounts,
@@ -59,6 +57,39 @@ export default function Dashboard() {
         <ScopeCard scope="perso" month={month} />
         <ScopeCard scope="joint" month={month} />
       </div>
+
+      {data.trips.length > 0 && (
+        <a className="card" href="#voyages">
+          <div className="card-head">
+            <h2>Voyages</h2>
+            <span className="chev">›</span>
+          </div>
+          <div className="rows">
+            {data.trips.map((trip) => {
+              const spent = tripSpent(trip.id, data.transactions);
+              return (
+                <div className="row" key={trip.id}>
+                  <CatIcon name="Voyages" />
+                  <div className="main">
+                    <div className="title">{trip.name}</div>
+                    <div className="muted small num">
+                      {money0(spent)} dépensés sur {money0(trip.budget)}
+                    </div>
+                  </div>
+                  <span
+                    className={`value ${trip.budget - spent < 0 ? "bad" : ""}`}
+                  >
+                    {money0(trip.budget - spent)}
+                  </span>
+                  <div className="wide">
+                    <Bar ratio={trip.budget ? spent / trip.budget : 0} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </a>
+      )}
     </>
   );
 }
