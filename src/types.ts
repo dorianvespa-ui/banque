@@ -15,6 +15,8 @@ export interface Category {
   id: string;
   name: string;
   kind: "depense" | "revenu";
+  /** Revenu de fin de mois compté dans le budget du mois suivant. */
+  shift_next_month: boolean;
   sort: number;
 }
 

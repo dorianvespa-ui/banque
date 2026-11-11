@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { budgetMonth } from "../budget";
 import { useData } from "../data";
 import { currentMonth, money, money0, monthLabel, shiftMonth } from "../format";
 import { SCOPE_LABEL, type Scope } from "../types";
@@ -21,7 +22,17 @@ export default function Budget({ scope }: { scope: Scope }) {
       ),
     [transactions, accountIds],
   );
-  const txs = scoped.filter((t) => t.booked_on.startsWith(month));
+  const shifted = useMemo(
+    () =>
+      new Set(categories.filter((c) => c.shift_next_month).map((c) => c.id)),
+    [categories],
+  );
+  const inMonth = (t: (typeof scoped)[number], m: string) =>
+    budgetMonth(t, shifted) === m;
+  const txs = scoped.filter((t) => inMonth(t, month));
+  const carried = txs
+    .filter((t) => !t.booked_on.startsWith(month))
+    .reduce((sum, t) => sum + t.amount, 0);
 
   const kindOf = new Map(categories.map((c) => [c.id, c.kind]));
   const isIncome = (t: { amount: number; category_id: string | null }) =>
@@ -59,7 +70,7 @@ export default function Budget({ scope }: { scope: Scope }) {
   ).map((m) => ({
     month: m,
     spent: scoped
-      .filter((t) => t.booked_on.startsWith(m) && !isIncome(t))
+      .filter((t) => inMonth(t, m) && !isIncome(t))
       .reduce((sum, t) => sum - t.amount, 0),
   }));
   const historyMax = Math.max(planned, ...history.map((h) => h.spent), 1);
@@ -95,7 +106,15 @@ export default function Budget({ scope }: { scope: Scope }) {
       </div>
 
       <div className="tiles">
-        <Tile label="Revenus" value={money0(income)} />
+        <Tile
+          label="Revenus"
+          value={money0(income)}
+          hint={
+            carried
+              ? `dont ${money0(carried)} reçus fin ${monthLabel(shiftMonth(month, -1), true)}`
+              : undefined
+          }
+        />
         <Tile label="Dépenses" value={money0(spent)} />
         <Tile
           label="Reste sur le budget"

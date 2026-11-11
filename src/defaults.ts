@@ -39,6 +39,15 @@ const EXPENSES = [
 const INCOMES = ["Salaire", "Autres revenus"];
 
 export const DEFAULT_CATEGORIES: NewCategory[] = [
-  ...EXPENSES.map((name) => ({ name, kind: "depense" as const })),
-  ...INCOMES.map((name) => ({ name, kind: "revenu" as const })),
+  ...EXPENSES.map((name) => ({
+    name,
+    kind: "depense" as const,
+    shift_next_month: false,
+  })),
+  ...INCOMES.map((name) => ({
+    name,
+    kind: "revenu" as const,
+    // Le salaire versé en fin de mois finance le mois suivant.
+    shift_next_month: name === "Salaire",
+  })),
 ].map((c, sort) => ({ ...c, sort }));

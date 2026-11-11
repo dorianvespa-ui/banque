@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { decodeFile, parseStatement } from "../csv";
 import { useData } from "../data";
-import { dayLabel, money } from "../format";
+import { budgetMonth } from "../budget";
+import { dayLabel, money, monthLabel } from "../format";
 import type { Tx } from "../types";
 
 const PAGE = 200;
@@ -107,6 +108,10 @@ export default function Transactions() {
 
 function Row({ tx, account }: { tx: Tx; account: string }) {
   const { categories, update, insert, remove } = useData();
+  const counted = budgetMonth(
+    tx,
+    new Set(categories.filter((c) => c.shift_next_month).map((c) => c.id)),
+  );
 
   const value = tx.is_transfer ? "transfer" : (tx.category_id ?? "");
   const change = (v: string) =>
@@ -134,6 +139,9 @@ function Row({ tx, account }: { tx: Tx; account: string }) {
         <div className="muted small">
           <span className="only-mobile">{dayLabel(tx.booked_on)} · </span>
           {account}
+          {counted !== tx.booked_on.slice(0, 7) && (
+            <> · compté en {monthLabel(counted)}</>
+          )}
         </div>
       </td>
       <td className={`num nowrap ${tx.amount > 0 ? "good" : ""}`}>

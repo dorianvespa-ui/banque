@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { LATE_DAY } from "../budget";
 import { useData } from "../data";
 import { PasswordForm } from "./Password";
 import type { Account, AccountKind, Scope } from "../types";
@@ -148,7 +149,12 @@ function Categories() {
     e.preventDefault();
     if (!name.trim()) return;
     void insert("categories", [
-      { name: name.trim(), kind, sort: categories.length },
+      {
+        name: name.trim(),
+        kind,
+        shift_next_month: false,
+        sort: categories.length,
+      },
     ]);
     setName("");
   };
@@ -202,6 +208,28 @@ function Categories() {
         </select>
         <button>Ajouter</button>
       </form>
+      <h3>Revenus de fin de mois</h3>
+      <p className="muted">
+        Coche un revenu pour le compter dans le budget du mois suivant quand il
+        arrive à partir du {LATE_DAY} du mois : un salaire versé fin octobre
+        entre alors dans le budget de novembre.
+      </p>
+      {categories
+        .filter((c) => c.kind === "revenu")
+        .map((c) => (
+          <label key={c.id} className="check">
+            <input
+              type="checkbox"
+              checked={c.shift_next_month}
+              onChange={(e) =>
+                void update("categories", c.id, {
+                  shift_next_month: e.target.checked,
+                })
+              }
+            />
+            {c.name}
+          </label>
+        ))}
     </section>
   );
 }
