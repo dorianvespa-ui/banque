@@ -1,4 +1,5 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
-export default defineConfig({ plugins: [react()] })
+// Chemins relatifs : l'appli est servie depuis un sous-dossier sur GitHub Pages.
+export default defineConfig({ base: "./", plugins: [react()] });
