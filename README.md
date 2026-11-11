@@ -9,6 +9,8 @@ opérations bancaires et suivi du patrimoine. Appli web React + Supabase.
   principales dépenses, patrimoine).
 - **Budget perso / Budget joint** : revenus, dépenses et plafonds mensuels par catégorie, pour les
   comptes rattachés à chaque budget. Les virements internes sont exclus.
+- **Voyages** : un budget par voyage, financé par l'épargne. Les opérations rattachées à un voyage
+  (remboursements compris) sortent des plafonds du mois.
 - **Opérations** : import des relevés CSV (Revolut, Crédit Agricole), sans doublon en cas de
   réimport, puis classement par catégorie. Les règles classent automatiquement les libellés connus.
 - **Patrimoine** : saisie du solde de chaque compte (épargne, PEA, assurance vie, PEE…) et évolution

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { budgetMonth } from "../budget";
+import { budgetMonth, isTodo } from "../budget";
 import { decodeFile, parseStatement } from "../csv";
 import { useData } from "../data";
 import { longDay, money, monthLabel } from "../format";
@@ -22,11 +22,9 @@ export default function Transactions() {
       (!accountId || t.account_id === accountId) &&
       (!month || t.booked_on.startsWith(month)) &&
       (!q || t.label.toLowerCase().includes(q)) &&
-      (!onlyTodo || (!t.category_id && !t.is_transfer)),
+      (!onlyTodo || isTodo(t)),
   );
-  const todo = transactions.filter(
-    (t) => !t.category_id && !t.is_transfer,
-  ).length;
+  const todo = transactions.filter(isTodo).length;
   const accountName = new Map(
     accounts.map((a) => [a.id, `${a.bank} · ${a.name}`]),
   );
@@ -129,7 +127,7 @@ function Row({
   account: string;
   counted: string;
 }) {
-  const { categories, update, insert, remove } = useData();
+  const { categories, trips, update, insert, remove } = useData();
 
   const category = categories.find((c) => c.id === tx.category_id);
   const value = tx.is_transfer ? "transfer" : (tx.category_id ?? "");
@@ -185,7 +183,7 @@ function Row({
         <select
           value={value}
           onChange={(e) => change(e.target.value)}
-          className={value ? "pill" : "pill todo"}
+          className={value || tx.trip_id ? "pill" : "pill todo"}
           aria-label="Catégorie"
         >
           <option value="">À classer</option>
@@ -209,6 +207,25 @@ function Row({
               ))}
           </optgroup>
         </select>
+        {trips.length > 0 && (
+          <select
+            value={tx.trip_id ?? ""}
+            onChange={(e) =>
+              void update("transactions", tx.id, {
+                trip_id: e.target.value || null,
+              })
+            }
+            className="pill"
+            aria-label="Voyage"
+          >
+            <option value="">Hors voyage</option>
+            {trips.map((t) => (
+              <option key={t.id} value={t.id}>
+                ✈️ {t.name}
+              </option>
+            ))}
+          </select>
+        )}
         <span style={{ flex: 1 }} />
         {value && (
           <button

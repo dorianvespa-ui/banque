@@ -49,7 +49,8 @@ export function summarize(scope: Scope, month: string, data: BudgetData) {
   let uncategorized = 0;
   let uncategorizedCount = 0;
   for (const t of data.transactions) {
-    if (t.is_transfer || !accountIds.has(t.account_id)) continue;
+    // Les opérations rattachées à un voyage comptent dans son budget, pas dans le mois.
+    if (t.is_transfer || t.trip_id || !accountIds.has(t.account_id)) continue;
     if (budgetMonth(t, shifted) !== month) continue;
     const isIncome = t.category_id
       ? kindOf.get(t.category_id) === "revenu"
@@ -86,6 +87,16 @@ export function summarize(scope: Scope, month: string, data: BudgetData) {
     uncategorizedCount,
     expenses,
   };
+}
+
+/** Une opération reste « à classer » tant qu'elle n'a ni catégorie, ni voyage, ni statut de virement interne. */
+export const isTodo = (t: Tx) => !t.category_id && !t.is_transfer && !t.trip_id;
+
+/** Coût net d'un voyage : dépenses rattachées, moins les remboursements reçus. */
+export function tripSpent(tripId: string, transactions: Tx[]): number {
+  let total = 0;
+  for (const t of transactions) if (t.trip_id === tripId) total -= t.amount;
+  return total || 0; // évite « -0 »
 }
 
 /** Dernier solde connu d'un compte à une date donnée. */

@@ -128,7 +128,7 @@ a {
   display: flex;
   justify-content: space-around;
   padding: 8px 6px calc(env(safe-area-inset-bottom) + 8px);
-  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border-top: 1px solid var(--line);
@@ -141,7 +141,7 @@ a {
   justify-items: center;
   gap: 3px;
   padding: 4px 0;
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   font-weight: 600;
   color: var(--muted);
   text-decoration: none;

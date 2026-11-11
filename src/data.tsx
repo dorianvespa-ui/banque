@@ -17,6 +17,7 @@ import type {
   Category,
   Rule,
   Scope,
+  Trip,
   Tx,
 } from "./types";
 
@@ -27,6 +28,7 @@ interface Tables {
   transactions: Tx[];
   rules: Rule[];
   balances: Balance[];
+  trips: Trip[];
 }
 type TableName = keyof Tables;
 type Row<T extends TableName> = Tables[T][number];
@@ -38,6 +40,7 @@ const EMPTY: Tables = {
   transactions: [],
   rules: [],
   balances: [],
+  trips: [],
 };
 
 const ORDER: Record<TableName, string> = {
@@ -47,10 +50,11 @@ const ORDER: Record<TableName, string> = {
   transactions: "booked_on",
   rules: "created_at",
   balances: "as_of",
+  trips: "created_at",
 };
 
 // Postgres renvoie les « numeric » sous forme de texte : on les convertit en nombres.
-const NUMERIC = ["amount", "monthly_limit", "share"];
+const NUMERIC = ["amount", "monthly_limit", "share", "budget"];
 function fix<T>(row: T): T {
   const r = row as Record<string, unknown>;
   for (const k of NUMERIC) if (typeof r[k] === "string") r[k] = Number(r[k]);
