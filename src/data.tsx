@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import type { ParsedTx } from "./csv";
+import { matchRule } from "./rules";
 import { supabase } from "./supabase";
 import type {
   Account,
@@ -70,11 +71,6 @@ async function fetchAll<T extends TableName>(table: T): Promise<Row<T>[]> {
     rows.push(...(data as Row<T>[]).map(fix));
     if (data.length < page) return rows;
   }
-}
-
-export function matchRule(label: string, rules: Rule[]): Rule | undefined {
-  const l = label.toLowerCase();
-  return rules.find((r) => l.includes(r.pattern.toLowerCase()));
 }
 
 interface Store extends Tables {

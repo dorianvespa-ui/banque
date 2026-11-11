@@ -1,67 +1,28 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { summarize } from "../budget";
 import { useData } from "../data";
 import { currentMonth, money, money0, monthLabel, shiftMonth } from "../format";
 import { SCOPE_LABEL, type Scope } from "../types";
 
 export default function Budget({ scope }: { scope: Scope }) {
-  const { accounts, categories, budgets, transactions, setBudget } = useData();
+  const data = useData();
+  const { accounts, setBudget } = data;
   const [month, setMonth] = useState(currentMonth);
 
   const scopeAccounts = accounts.filter((a) => a.budget_scope === scope);
-  const accountIds = useMemo(
-    () => new Set(scopeAccounts.map((a) => a.id)),
-    [accounts, scope],
-  );
-
-  // Opérations du budget, hors virements internes.
-  const scoped = useMemo(
-    () =>
-      transactions.filter(
-        (t) => accountIds.has(t.account_id) && !t.is_transfer,
-      ),
-    [transactions, accountIds],
-  );
-  const txs = scoped.filter((t) => t.booked_on.startsWith(month));
-
-  const kindOf = new Map(categories.map((c) => [c.id, c.kind]));
-  const isIncome = (t: { amount: number; category_id: string | null }) =>
-    t.category_id ? kindOf.get(t.category_id) === "revenu" : t.amount > 0;
-
-  const byCategory = new Map<string, number>();
-  let income = 0;
-  let spent = 0;
-  let uncategorized = 0;
-  let uncategorizedCount = 0;
-  for (const t of txs) {
-    if (isIncome(t)) income += t.amount;
-    else spent -= t.amount;
-    if (t.category_id)
-      byCategory.set(
-        t.category_id,
-        (byCategory.get(t.category_id) ?? 0) + t.amount,
-      );
-    else {
-      uncategorizedCount++;
-      if (t.amount < 0) uncategorized -= t.amount;
-    }
-  }
-
-  const limits = new Map(
-    budgets
-      .filter((b) => b.scope === scope)
-      .map((b) => [b.category_id, b.monthly_limit]),
-  );
-  const planned = [...limits.values()].reduce((a, b) => a + b, 0);
-  const expenseCategories = categories.filter((c) => c.kind === "depense");
+  const {
+    income,
+    spent,
+    planned,
+    carried,
+    uncategorized,
+    uncategorizedCount,
+    expenses,
+  } = summarize(scope, month, data);
 
   const history = Array.from({ length: 6 }, (_, i) =>
     shiftMonth(month, i - 5),
-  ).map((m) => ({
-    month: m,
-    spent: scoped
-      .filter((t) => t.booked_on.startsWith(m) && !isIncome(t))
-      .reduce((sum, t) => sum - t.amount, 0),
-  }));
+  ).map((m) => ({ month: m, spent: summarize(scope, m, data).spent }));
   const historyMax = Math.max(planned, ...history.map((h) => h.spent), 1);
 
   return (
@@ -95,7 +56,15 @@ export default function Budget({ scope }: { scope: Scope }) {
       </div>
 
       <div className="tiles">
-        <Tile label="Revenus" value={money0(income)} />
+        <Tile
+          label="Revenus"
+          value={money0(income)}
+          hint={
+            carried
+              ? `dont ${money0(carried)} reçus fin ${monthLabel(shiftMonth(month, -1), true)}`
+              : undefined
+          }
+        />
         <Tile label="Dépenses" value={money0(spent)} />
         <Tile
           label="Reste sur le budget"
@@ -135,9 +104,7 @@ export default function Budget({ scope }: { scope: Scope }) {
               </tr>
             </thead>
             <tbody>
-              {expenseCategories.map((c) => {
-                const value = -(byCategory.get(c.id) ?? 0) || 0; // évite « -0 »
-                const limit = limits.get(c.id);
+              {expenses.map(({ category: c, spent: value, limit }) => {
                 const ratio = limit ? value / limit : 0;
                 return (
                   <tr key={c.id}>

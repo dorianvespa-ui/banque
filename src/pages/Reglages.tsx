@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { LATE_DAY } from "../budget";
 import { useData } from "../data";
 import { PasswordForm } from "./Password";
 import type { Account, AccountKind, Scope } from "../types";
@@ -148,7 +149,12 @@ function Categories() {
     e.preventDefault();
     if (!name.trim()) return;
     void insert("categories", [
-      { name: name.trim(), kind, sort: categories.length },
+      {
+        name: name.trim(),
+        kind,
+        shift_next_month: false,
+        sort: categories.length,
+      },
     ]);
     setName("");
   };
@@ -202,6 +208,28 @@ function Categories() {
         </select>
         <button>Ajouter</button>
       </form>
+      <h3>Revenus de fin de mois</h3>
+      <p className="muted">
+        Coche un revenu pour le compter dans le budget du mois suivant quand il
+        arrive à partir du {LATE_DAY} du mois : un salaire versé fin octobre
+        entre alors dans le budget de novembre.
+      </p>
+      {categories
+        .filter((c) => c.kind === "revenu")
+        .map((c) => (
+          <label key={c.id} className="check">
+            <input
+              type="checkbox"
+              checked={c.shift_next_month}
+              onChange={(e) =>
+                void update("categories", c.id, {
+                  shift_next_month: e.target.checked,
+                })
+              }
+            />
+            {c.name}
+          </label>
+        ))}
     </section>
   );
 }
@@ -210,6 +238,7 @@ function Rules() {
   const { rules, categories, insert, remove, applyRules } = useData();
   const [pattern, setPattern] = useState("");
   const [target, setTarget] = useState("transfer");
+  const [exact, setExact] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const categoryName = new Map(categories.map((c) => [c.id, c.name]));
 
@@ -219,6 +248,7 @@ function Rules() {
     void insert("rules", [
       {
         pattern: pattern.trim(),
+        exact,
         is_transfer: target === "transfer",
         category_id: target === "transfer" ? null : target,
       },
@@ -231,36 +261,52 @@ function Rules() {
       <h2>Règles de classement</h2>
       <p className="muted">
         Une règle classe automatiquement, à l'import, toute opération dont le
-        libellé contient le texte indiqué.
+        libellé contient le texte indiqué, ou lui est exactement égal. Si
+        plusieurs règles conviennent, la plus précise l'emporte.
       </p>
       {rules.length > 0 && (
-        <table>
-          <tbody>
-            {rules.map((r) => (
-              <tr key={r.id}>
-                <td>« {r.pattern} »</td>
-                <td>
-                  →{" "}
-                  {r.is_transfer
-                    ? "Virement interne"
-                    : (categoryName.get(r.category_id ?? "") ?? "—")}
-                </td>
-                <td>
-                  <button
-                    className="ghost small"
-                    onClick={() => void remove("rules", r.id)}
-                  >
-                    Supprimer
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <details>
+          <summary>
+            {rules.length} règle{rules.length > 1 ? "s" : ""}
+          </summary>
+          <table>
+            <tbody>
+              {rules.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    {r.exact ? "=" : "contient"} « {r.pattern} »
+                  </td>
+                  <td>
+                    →{" "}
+                    {r.is_transfer
+                      ? "Virement interne"
+                      : (categoryName.get(r.category_id ?? "") ?? "—")}
+                  </td>
+                  <td>
+                    <button
+                      className="ghost small"
+                      onClick={() => void remove("rules", r.id)}
+                    >
+                      Supprimer
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
       )}
       <form className="filters" onSubmit={add}>
+        <select
+          value={exact ? "exact" : "contains"}
+          onChange={(e) => setExact(e.target.value === "exact")}
+          aria-label="Type de règle"
+        >
+          <option value="contains">Le libellé contient</option>
+          <option value="exact">Le libellé est exactement</option>
+        </select>
         <input
-          placeholder="Le libellé contient…"
+          placeholder="Texte du libellé"
           value={pattern}
           onChange={(e) => setPattern(e.target.value)}
         />

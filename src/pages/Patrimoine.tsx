@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { latest } from "../budget";
 import { useData } from "../data";
 import {
   currentMonth,
@@ -15,24 +16,6 @@ import {
   type AccountKind,
   type Balance,
 } from "../types";
-
-/** Dernier solde connu d'un compte à une date donnée. */
-function latest(
-  balances: Balance[],
-  accountId: string,
-  until: string,
-): Balance | undefined {
-  let best: Balance | undefined;
-  for (const b of balances) {
-    if (
-      b.account_id === accountId &&
-      b.as_of <= until &&
-      (!best || b.as_of > best.as_of)
-    )
-      best = b;
-  }
-  return best;
-}
 
 export default function Patrimoine() {
   const { accounts, balances } = useData();

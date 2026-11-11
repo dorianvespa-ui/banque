@@ -52,7 +52,20 @@ function detectDelimiter(text: string): string {
   return ",";
 }
 
-const IGNORED_STATE = /revert|declin|fail|pending|annul|refus|attente|echou/;
+/** Sous-compte d'épargne mêlé au compte courant dans les exports Revolut. */
+const SAVINGS_PRODUCT = /depot|deposit|saving|epargne/;
+
+const ENTITIES: Record<string, string> = {
+  "&#39;": "'",
+  "&apos;": "'",
+  "&quot;": '"',
+  "&amp;": "&",
+};
+const decodeEntities = (s: string) =>
+  s.replace(/&(#39|apos|quot|amp);/g, (m) => ENTITIES[m]);
+
+const IGNORED_STATE =
+  /revert|renvoy|declin|fail|pending|annul|refus|attente|echou/;
 
 /**
  * Lit un relevé CSV de banque (Revolut, Crédit Agricole et formats proches) :
@@ -96,11 +109,15 @@ export function parseStatement(text: string): ParsedTx[] {
   const creditCol = find(h, "credit");
   const feeCol = find(h, "fee", "frais");
   const stateCol = find(h, "state", "etat");
+  const productCol = find(h, "product", "produit");
 
   const seen = new Map<string, number>();
   const out: ParsedTx[] = [];
   for (const row of data.slice(headerIdx + 1)) {
     if (stateCol >= 0 && IGNORED_STATE.test(norm(row[stateCol] ?? "")))
+      continue;
+    // Les mouvements du sous-compte d'épargne doublonnent ceux du compte courant.
+    if (productCol >= 0 && SAVINGS_PRODUCT.test(norm(row[productCol] ?? "")))
       continue;
     let date: string | null = null;
     for (const c of dateCols) if ((date = parseDate(row[c]))) break;
@@ -123,7 +140,9 @@ export function parseStatement(text: string): ParsedTx[] {
     if (amount === 0) continue;
 
     const label =
-      (row[labelCol] ?? "").replace(/\s+/g, " ").trim() || "(sans libellé)";
+      decodeEntities(row[labelCol] ?? "")
+        .replace(/\s+/g, " ")
+        .trim() || "(sans libellé)";
     // Deux opérations identiques le même jour restent distinctes grâce au compteur.
     const key = `${date}|${amount}|${label}`;
     const n = seen.get(key) ?? 0;

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { DataProvider, useData } from "./data";
 import { DEFAULT_ACCOUNTS, DEFAULT_CATEGORIES } from "./defaults";
 import Budget from "./pages/Budget";
+import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import { PasswordForm } from "./pages/Password";
 import Patrimoine from "./pages/Patrimoine";
@@ -11,6 +12,7 @@ import Transactions from "./pages/Transactions";
 import { configured, supabase } from "./supabase";
 
 const TABS = [
+  { id: "accueil", label: "Tableau de bord" },
   { id: "perso", label: "Budget perso" },
   { id: "joint", label: "Budget joint" },
   { id: "transactions", label: "Opérations" },
@@ -21,7 +23,7 @@ type TabId = (typeof TABS)[number]["id"];
 
 const tabFromHash = (): TabId => {
   const id = location.hash.slice(1);
-  return TABS.some((t) => t.id === id) ? (id as TabId) : "perso";
+  return TABS.some((t) => t.id === id) ? (id as TabId) : "accueil";
 };
 
 export default function App() {
@@ -109,6 +111,8 @@ function Shell() {
           <p className="muted">Chargement…</p>
         ) : data.accounts.length === 0 && tab !== "reglages" ? (
           <Onboarding />
+        ) : tab === "accueil" ? (
+          <Dashboard />
         ) : tab === "perso" || tab === "joint" ? (
           <Budget key={tab} scope={tab} />
         ) : tab === "transactions" ? (
