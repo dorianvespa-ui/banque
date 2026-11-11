@@ -4,6 +4,7 @@ import { DataProvider, useData } from "./data";
 import { DEFAULT_ACCOUNTS, DEFAULT_CATEGORIES } from "./defaults";
 import Budget from "./pages/Budget";
 import Login from "./pages/Login";
+import { PasswordForm } from "./pages/Password";
 import Patrimoine from "./pages/Patrimoine";
 import Reglages from "./pages/Reglages";
 import Transactions from "./pages/Transactions";
@@ -25,15 +26,18 @@ const tabFromHash = (): TabId => {
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  // Vrai quand on arrive depuis le lien « mot de passe oublié » reçu par mail.
+  const [recovery, setRecovery] = useState(false);
 
   useEffect(() => {
     if (!configured) return;
     void supabase.auth
       .getSession()
       .then(({ data }) => setSession(data.session));
-    const { data } = supabase.auth.onAuthStateChange((_event, s) =>
-      setSession(s),
-    );
+    const { data } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === "PASSWORD_RECOVERY") setRecovery(true);
+      setSession(s);
+    });
     return () => data.subscription.unsubscribe();
   }, []);
 
@@ -53,6 +57,16 @@ export default function App() {
   }
   if (session === undefined) return null;
   if (!session) return <Login />;
+  if (recovery) {
+    return (
+      <main className="center">
+        <div className="card login">
+          <h1>Nouveau mot de passe</h1>
+          <PasswordForm onDone={() => setRecovery(false)} />
+        </div>
+      </main>
+    );
+  }
   return (
     <DataProvider key={session.user.id}>
       <Shell />

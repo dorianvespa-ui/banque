@@ -441,3 +441,20 @@ input.limit {
     text-align: right;
   }
 }
+
+.password {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.password input {
+  flex: 1;
+  min-width: 14em;
+}
+
+.password p {
+  flex-basis: 100%;
+  margin: 0;
+}
